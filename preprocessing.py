@@ -74,10 +74,12 @@ def all_data2fold(fold_num):
         print(label, len(data))
         batch_size = int(len(data) / fold_num)
         other = len(data) - batch_size * fold_num
+        used = 0
         for i in range(fold_num):
             cur_batch_size = batch_size + 1 if i < other else batch_size
             # print(cur_batch_size)
-            batch_data = [data[i * batch_size + b] for b in range(cur_batch_size)]
+            batch_data = [data[used + b] for b in range(cur_batch_size)]
+            used += cur_batch_size
             all_index[i].extend(batch_data)
 
     batch_size = int(total / fold_num)
