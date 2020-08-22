@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
 from src.vocab import Vocab
 
 
@@ -17,6 +18,47 @@ def write_data(file_name, data):
     pickle.dump(data, file, protocol=4)
     file.close()
     print(file_name, len(data['text']))
+
+
+def convert_data_tfidf(files):
+    for filename in files:
+        file = open('./data/' + filename + '.pickle', 'rb')
+        data = pickle.load(file)
+
+        texts = data['text']
+        if filename.startswith("train"):
+            vectorizer = TfidfVectorizer()
+            arrays = vectorizer.fit_transform(texts).toarray()
+        else:
+            arrays = vectorizer.transform(texts).toarray()
+
+        dic = {'text': arrays, 'label': data['label']}
+
+        file_name = './data/' + filename + '.tfidf.pickle'
+        write_data(file_name, dic)
+
+        print(filename, arrays.shape)
+
+
+def convert_data_unk(filename, vocab):
+    file = open('./data/' + filename + '.pickle', 'rb')
+    data = pickle.load(file)
+
+    examples = []
+    labels = []
+    for text, label in zip(data['text'], data['label']):
+        words = text.split()
+        words = [word if word in vocab._id2word else '<>' for word in words]
+        sent_len = len(words)
+        assert sent_len > 0
+        examples.append(' '.join(words))
+        labels.append(label)
+
+    dic = {'text': examples, 'label': labels}
+    file = open('./data/' + filename + '.data.pickle', 'wb')
+    pickle.dump(dic, file)
+    file.close()
+    print(filename, len(examples))
 
 
 def convert_data_word2vec(filename):
@@ -44,6 +86,21 @@ def convert_data_bert_pretrain(filename):
 
     assert num == len(data['label'])
     print(filename, num)
+
+
+def convert_data_fasttext(filename):
+    f = open('./data/' + filename + '.pickle', 'rb')
+    data = pickle.load(f)
+    num = 0
+    f_out = open('./data/' + filename + '.fasttext.txt', 'w')
+    for text, label in zip(data['text'], data['label']):
+        line = '__label__' + str(label) + ' ' + text
+        f_out.write(line + '\n')
+        num += 1
+
+    assert num == len(data['label'])
+    print(filename, num)
+
 
 def all_data2fold(fold_num):
     f = pd.read_csv('./data/train_set.csv', sep='\t', encoding='UTF-8')
@@ -74,12 +131,10 @@ def all_data2fold(fold_num):
         print(label, len(data))
         batch_size = int(len(data) / fold_num)
         other = len(data) - batch_size * fold_num
-        used = 0
         for i in range(fold_num):
             cur_batch_size = batch_size + 1 if i < other else batch_size
             # print(cur_batch_size)
-            batch_data = [data[used + b] for b in range(cur_batch_size)]
-            used += cur_batch_size
+            batch_data = [data[i * batch_size + b] for b in range(cur_batch_size)]
             all_index[i].extend(batch_data)
 
     batch_size = int(total / fold_num)
@@ -129,6 +184,12 @@ def fold2data(fold_num):
     fold_lens = []
     writer = pd.ExcelWriter('collect.xlsx')
     for fold in range(9, fold_num):
+        # test
+        # f_test = open('./data/fold_' + str(fold) + '.pickle', 'rb')
+        # test_data = pickle.load(f_test)
+        # file_name = './data/test_' + str(fold) + '.pickle'
+        # write_data(file_name, test_data)
+
         # dev
         fold_ = fold
         f_dev = open('./data/fold_' + str(fold_) + '.pickle', 'rb')
@@ -193,12 +254,11 @@ def fold2data(fold_num):
 
 if __name__ == "__main__":
     fold_num = 10
-
-    # split data to 10 fold
-    all_data2fold(fold_num)
-
-    # fold to train, dev data
-    fold2data(fold_num)
+    # print('split data to fold')
+    # all_data2fold(fold_num)
+    #
+    # print('fold to train, dev, test data')
+    # fold2data(fold_num)
 
     # convert each fold data
     for fold in range(9, fold_num):
@@ -222,9 +282,17 @@ if __name__ == "__main__":
 
         for file in files:
             pass
+            # data 2 fasttext
+            # convert_data_fasttext(file)
 
             # data 2 word2vec
             # convert_data_word2vec(file)
 
+            # data 2 unk
+            # convert_data_unk(file, vocab)
+
             # data 2 bert
             # convert_data_bert_pretrain(train)
+
+        # data 2 tfidf
+        # convert_data_tfidf(files)
